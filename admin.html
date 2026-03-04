@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard Manager</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.09);
+      padding: 44px 40px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #111;
+    }
+    .logout-link {
+      font-size: 13px;
+      color: #9ca3af;
+      text-decoration: none;
+    }
+    .logout-link:hover { color: #6b7280; }
+
+    /* Status banner */
+    .status {
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .status.active { background: #ecfdf5; border: 1.5px solid #6ee7b7; }
+    .status.empty  { background: #f9fafb; border: 1.5px solid #e5e7eb; }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status.active .status-dot { background: #10b981; }
+    .status.empty  .status-dot { background: #d1d5db; }
+    .status-text { flex: 1; }
+    .status-label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #374151;
+    }
+    .status-name {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+      word-break: break-all;
+    }
+    .view-link {
+      font-size: 12px;
+      color: #5b21b6;
+      text-decoration: none;
+      font-weight: 500;
+      white-space: nowrap;
+    }
+    .view-link:hover { text-decoration: underline; }
+
+    /* Section headers */
+    .section-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #9ca3af;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 10px;
+    }
+
+    /* Upload zone */
+    .upload-zone {
+      border: 2px dashed #d1d5db;
+      border-radius: 10px;
+      padding: 28px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      margin-bottom: 12px;
+      position: relative;
+    }
+    .upload-zone:hover { border-color: #7c3aed; background: #faf5ff; }
+    .upload-zone.dragover { border-color: #7c3aed; background: #faf5ff; }
+    .upload-icon { font-size: 28px; margin-bottom: 8px; }
+    .upload-text {
+      font-size: 14px;
+      color: #374151;
+      font-weight: 500;
+    }
+    .upload-sub {
+      font-size: 12px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
+    #file-input {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      cursor: pointer;
+      width: 100%;
+      height: 100%;
+    }
+    #file-name {
+      font-size: 13px;
+      color: #5b21b6;
+      font-weight: 500;
+      margin-bottom: 12px;
+      min-height: 18px;
+    }
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 9px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    .btn-primary { background: #5b21b6; color: #fff; }
+    .btn-primary:hover { background: #4c1d95; }
+    .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn-danger  { background: #fee2e2; color: #b91c1c; margin-top: 10px; }
+    .btn-danger:hover  { background: #fecaca; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid #f3f4f6;
+      margin: 28px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <div class="header">
+      <h1>Dashboard Manager</h1>
+      <a class="logout-link" href="/logout">Log out</a>
+    </div>
+
+    <!-- Status -->
+    <div class="status {{ 'active' if has_file else 'empty' }}">
+      <div class="status-dot"></div>
+      <div class="status-text">
+        <div class="status-label">{{ 'Dashboard is live' if has_file else 'No dashboard active' }}</div>
+        {% if has_file %}
+          <div class="status-name">{{ filename }}</div>
+        {% else %}
+          <div class="status-name">Upload a file below to share it with your team</div>
+        {% endif %}
+      </div>
+      {% if has_file %}
+        <a class="view-link" href="/" target="_blank">View →</a>
+      {% endif %}
+    </div>
+
+    <!-- Upload -->
+    <p class="section-label">Upload New Dashboard</p>
+    <form action="/upload" method="post" enctype="multipart/form-data" id="upload-form">
+      <div class="upload-zone" id="drop-zone">
+        <input type="file" name="file" id="file-input" accept=".html" />
+        <div class="upload-icon">📄</div>
+        <div class="upload-text">Click to choose a file, or drag &amp; drop</div>
+        <div class="upload-sub">HTML files only</div>
+      </div>
+      <div id="file-name"></div>
+      <button type="submit" class="btn btn-primary" id="upload-btn" disabled>Upload &amp; Go Live</button>
+    </form>
+
+    {% if has_file %}
+      <hr class="divider" />
+      <p class="section-label">Remove Current Dashboard</p>
+      <form action="/clear" method="post" onsubmit="return confirm('Remove the current dashboard? Viewers will see an empty page.')">
+        <button type="submit" class="btn btn-danger">Clear Dashboard</button>
+      </form>
+    {% endif %}
+
+  </div>
+
+  <script>
+    const input   = document.getElementById('file-input');
+    const label   = document.getElementById('file-name');
+    const btn     = document.getElementById('upload-btn');
+    const zone    = document.getElementById('drop-zone');
+
+    input.addEventListener('change', () => {
+      if (input.files.length) {
+        label.textContent = '✓ ' + input.files[0].name;
+        btn.disabled = false;
+      }
+    });
+
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault();
+      zone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.name.toLowerCase().endsWith('.html')) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        input.files = dt.files;
+        label.textContent = '✓ ' + file.name;
+        btn.disabled = false;
+      } else {
+        label.textContent = '⚠ Please drop an .html file';
+      }
+    });
+  </script>
+</body>
+</html>
