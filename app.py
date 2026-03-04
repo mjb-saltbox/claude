@@ -1,28 +1,48 @@
-from flask import Flask, render_template, request, redirect, url_for, session, make_response
 import os
+import traceback
+from flask import Flask, render_template, request, redirect, url_for, session, make_response
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'please-set-a-secret-key')
 
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'admin')
+ADMIN_PASSWORD  = os.environ.get('ADMIN_PASSWORD', 'admin')
 VIEWER_PASSWORD = os.environ.get('VIEWER_PASSWORD', 'viewer')
 
-DASHBOARD_FILE = '/tmp/dashboard.html'
-DASHBOARD_NAME_FILE = '/tmp/dashboard_name.txt'
+# /tmp is guaranteed writable on Render (and most cloud platforms)
+UPLOAD_DIR     = '/tmp/dashboard_uploads'
+DASHBOARD_FILE = os.path.join(UPLOAD_DIR, 'dashboard.html')
+DASHBOARD_NAME = os.path.join(UPLOAD_DIR, 'dashboard_name.txt')
+
+
+def ensure_upload_dir():
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 def get_dashboard():
-    if os.path.exists(DASHBOARD_FILE):
-        with open(DASHBOARD_FILE, 'r', encoding='utf-8') as f:
-            return f.read()
+    try:
+        if os.path.exists(DASHBOARD_FILE):
+            with open(DASHBOARD_FILE, 'r', encoding='utf-8') as f:
+                return f.read()
+    except Exception:
+        pass
     return None
 
 
 def get_dashboard_name():
-    if os.path.exists(DASHBOARD_NAME_FILE):
-        with open(DASHBOARD_NAME_FILE, 'r', encoding='utf-8') as f:
-            return f.read().strip()
+    try:
+        if os.path.exists(DASHBOARD_NAME):
+            with open(DASHBOARD_NAME, 'r', encoding='utf-8') as f:
+                return f.read().strip()
+    except Exception:
+        pass
     return None
+
+
+# ── Health check (useful for UptimeRobot pings) ───────────────────────────────
+
+@app.route('/health')
+def health():
+    return 'ok', 200
 
 
 # ── Viewer ────────────────────────────────────────────────────────────────────
@@ -75,11 +95,13 @@ def upload():
 
     f = request.files.get('file')
     if f and f.filename.lower().endswith('.html'):
+        ensure_upload_dir()
         content = f.read().decode('utf-8')
         with open(DASHBOARD_FILE, 'w', encoding='utf-8') as out:
             out.write(content)
-        with open(DASHBOARD_NAME_FILE, 'w', encoding='utf-8') as out:
+        with open(DASHBOARD_NAME, 'w', encoding='utf-8') as out:
             out.write(f.filename)
+
     return redirect(url_for('admin'))
 
 
@@ -88,9 +110,12 @@ def clear():
     if not session.get('admin_ok'):
         return redirect(url_for('admin'))
 
-    for path in [DASHBOARD_FILE, DASHBOARD_NAME_FILE]:
-        if os.path.exists(path):
-            os.remove(path)
+    for path in [DASHBOARD_FILE, DASHBOARD_NAME]:
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
 
     return redirect(url_for('admin'))
 
@@ -99,6 +124,17 @@ def clear():
 def logout():
     session.clear()
     return redirect(url_for('view'))
+
+
+# ── Error handlers ────────────────────────────────────────────────────────────
+
+@app.errorhandler(500)
+def internal_error(e):
+    tb = traceback.format_exc()
+    # Only expose details if SHOW_ERRORS env var is set — remove after debugging
+    if os.environ.get('SHOW_ERRORS'):
+        return f'<pre style="padding:2rem;font-size:13px">{tb}</pre>', 500
+    return render_template('error.html'), 500
 
 
 if __name__ == '__main__':
